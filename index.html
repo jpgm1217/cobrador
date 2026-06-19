@@ -174,6 +174,15 @@ document.readyState==='loading'?document.addEventListener('DOMContentLoaded',ren
 <div class="scroll">
 
 <div id="panel-ruta" class="panel active">
+  <div id="banner-offline" style="display:none;background:rgba(255,107,107,.15);border:1px solid var(--red);border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:12px;color:var(--red);font-weight:600">📵 Sin conexión — un cobro que registres ahora puede no guardarse. Verifica tu internet antes de cobrar.</div>
+  <!-- Disponible para prestar (lo define el admin) -->
+  <div class="card" style="border-color:var(--goldb);display:flex;justify-content:space-between;align-items:center;padding:12px 14px;margin-bottom:10px">
+    <div>
+      <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">💵 Disponible para prestar</div>
+      <div style="font-size:10px;color:var(--text3)">lo define el admin</div>
+    </div>
+    <div style="font-family:'Syne',sans-serif;font-size:24px;font-weight:800;color:var(--gold)" id="cob-disponible-val">—</div>
+  </div>
   <!-- Resumen de inicio -->
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
     <div class="metric green"><div class="ml">Por cobrar hoy</div><div class="mv" id="r-pendiente">$0</div></div>
@@ -357,10 +366,16 @@ document.readyState==='loading'?document.addEventListener('DOMContentLoaded',ren
     <div class="confirm-amount" id="confirm-amount">$0</div>
     <div class="confirm-sub" id="confirm-sub">—</div>
     <div style="width:100%;margin:2px 0 14px">
-      <label style="font-size:12px;color:var(--text3);display:block;margin-bottom:6px">Mora cobrada (editable)</label>
+      <label style="font-size:12px;color:var(--text3);display:block;margin-bottom:6px">💢 Mora a cobrar — toca para sumar o escríbela</label>
       <input type="number" id="confirm-mora" step="500" min="0" value="0" inputmode="numeric"
         style="width:100%;padding:10px;border-radius:10px;border:1.5px solid rgba(255,255,255,.18);background:rgba(255,255,255,.05);color:var(--text);font-size:18px;font-weight:700;text-align:center"
         oninput="recalcConfirm()">
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <button type="button" onclick="addMoraRapida(1000)" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--red);background:transparent;color:var(--red);font-size:12px;font-weight:600;cursor:pointer">+1.000</button>
+        <button type="button" onclick="addMoraRapida(2000)" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--red);background:transparent;color:var(--red);font-size:12px;font-weight:600;cursor:pointer">+2.000</button>
+        <button type="button" onclick="addMoraRapida(5000)" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--red);background:transparent;color:var(--red);font-size:12px;font-weight:600;cursor:pointer">+5.000</button>
+        <button type="button" onclick="addMoraRapida(0)" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text3);font-size:12px;font-weight:600;cursor:pointer">Limpiar</button>
+      </div>
     </div>
     <div class="confirm-btns">
       <button class="confirm-no" onclick="cerrarConfirm()">Cancelar</button>
@@ -678,6 +693,8 @@ function setConn(ok){
   document.getElementById('dot').style.background=ok?'var(--green)':'var(--red)';
   document.getElementById('cfg-estado').textContent=ok?'Conectado ✓':'Sin conexión';
   document.getElementById('cfg-estado').style.color=ok?'var(--green)':'var(--red)';
+  const banner=document.getElementById('banner-offline');
+  if(banner)banner.style.display=ok?'none':'block';
 }
 // ── SIMULADOR ──
 const SIM_DIAS={diario:1,semanal:7,quincenal:15,mensual:30};
@@ -812,6 +829,13 @@ function escuchar(){
       renderGanancias();
     }
   });
+  // Disponible para prestar — lo define el admin, el cobrador solo lo ve
+  db.ref('config/disponibleManual').on('value',s=>{
+    const v=s.val();
+    window._dispManual=(v!==null&&v!==undefined)?Math.round(parseFloat(v)||0):null;
+    const el=document.getElementById('cob-disponible-val');
+    if(el)el.textContent=window._dispManual!=null?fmtMil(window._dispManual):'—';
+  });
 }
 
 // INIT
@@ -943,18 +967,18 @@ function renderGanancias(){
     });
   }
 
-  document.getElementById('g-total').textContent=fmt(resumen.total);
-  document.getElementById('g-liquidado').textContent=fmt(resumen.liquidado);
-  document.getElementById('g-pendiente').textContent=fmt(resumen.pendiente);
+  document.getElementById('g-total').textContent=fmtMil(resumen.total);
+  document.getElementById('g-liquidado').textContent=fmtMil(resumen.liquidado);
+  document.getElementById('g-pendiente').textContent=fmtMil(resumen.pendiente);
   document.getElementById('g-pct-info').textContent=`${pctGlob}% actual para próximos cobros`;
 
   const periodos=['semana','quincena','mes'];
   const periodEl=document.getElementById('g-periodos');
   if(periodEl){
     const tops=topClientesGanancia('mes',3);
-    periodEl.innerHTML=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">${periodos.map(p=>{const r=resumenPeriodoGanancias(p);return `<div class="cs"><div class="csl">${etiquetaPeriodo(p)}</div><div class="csv" style="color:var(--green)">${fmt(r.generada)}</div><div style="font-size:10px;color:var(--text3);margin-top:4px">Pendiente: ${fmt(r.pendiente)} · ${r.eventos} evento(s)</div></div>`;}).join('')}</div>`+
+    periodEl.innerHTML=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">${periodos.map(p=>{const r=resumenPeriodoGanancias(p);return `<div class="cs"><div class="csl">${etiquetaPeriodo(p)}</div><div class="csv" style="color:var(--green)">${fmtMil(r.generada)}</div><div style="font-size:10px;color:var(--text3);margin-top:4px">Pendiente: ${fmtMil(r.pendiente)} · ${r.eventos} evento(s)</div></div>`;}).join('')}</div>`+
       `<div style="margin-top:10px">`+
-      (tops.length?`<div style="font-size:11px;color:var(--text3);margin-bottom:6px">Clientes que más te generan este mes</div>`+tops.map((t,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)"><div style="font-size:12px">${i+1}. ${t.nombre}</div><div style="font-size:12px;font-weight:700;color:var(--green)">${fmt(t.total)}</div></div>`).join(''):`<div style="font-size:12px;color:var(--text3)">Sin comisión generada en el mes.</div>`)+`</div>`;
+      (tops.length?`<div style="font-size:11px;color:var(--text3);margin-bottom:6px">Clientes que más te generan este mes</div>`+tops.map((t,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)"><div style="font-size:12px">${i+1}. ${t.nombre}</div><div style="font-size:12px;font-weight:700;color:var(--green)">${fmtMil(t.total)}</div></div>`).join(''):`<div style="font-size:12px;color:var(--text3)">Sin comisión generada en el mes.</div>`)+`</div>`;
   }
   const alertEl=document.getElementById('g-alertas');
   if(alertEl){
@@ -977,18 +1001,18 @@ function renderGanancias(){
             <div style="font-size:11px;color:var(--text3)">${pCli}% actual · ${c.pagadas}/${c.numCuotas} cuotas · aplica a próximos cobros</div>
           </div>
           <div style="text-align:right">
-            <div style="font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:var(--green)">${fmt(r.pendiente)}</div>
+            <div style="font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:var(--green)">${fmtMil(r.pendiente)}</div>
             <div style="font-size:10px;color:var(--text3)">pendiente</div>
           </div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-top:6px">
-          <div class="cs"><div class="csl">Generada</div><div class="csv" style="font-size:12px">${fmt(r.generada)}</div></div>
-          <div class="cs"><div class="csl">Liquidada</div><div class="csv" style="font-size:12px">${fmt(r.liquidada)}</div></div>
-          <div class="cs"><div class="csl">Interés cobrado</div><div class="csv" style="font-size:12px">${fmt(r.interes)}</div></div>
+          <div class="cs"><div class="csl">Generada</div><div class="csv" style="font-size:12px">${fmtMil(r.generada)}</div></div>
+          <div class="cs"><div class="csl">Liquidada</div><div class="csv" style="font-size:12px">${fmtMil(r.liquidada)}</div></div>
+          <div class="cs"><div class="csl">Interés cobrado</div><div class="csv" style="font-size:12px">${fmtMil(r.interes)}</div></div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:5px">
-          <div class="cs"><div class="csl">Mora cobrada</div><div class="csv" style="font-size:12px">${fmt(r.mora)}</div></div>
-          <div class="cs"><div class="csl">Total comisión</div><div class="csv" style="font-size:12px;color:var(--green)">${fmt(r.generada)}</div></div>
+          <div class="cs"><div class="csl">Mora cobrada</div><div class="csv" style="font-size:12px">${fmtMil(r.mora)}</div></div>
+          <div class="cs"><div class="csl">Total comisión</div><div class="csv" style="font-size:12px;color:var(--green)">${fmtMil(r.generada)}</div></div>
         </div>
       </div>`;
     }).join('');
@@ -1317,7 +1341,7 @@ function abrirDetalleClienteCobrador(id){
     <div style="font-size:12px;color:var(--text3);margin-bottom:12px">${c.negocio||'—'}${c.zona?' · '+c.zona:''}${c.telefono?' · '+c.telefono:''}</div>
     ${accesosDirectos}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-      <div class="cs"><div class="csl">Saldo</div><div class="csv" style="color:var(--amber)">${fmt(sd)}</div></div>
+      <div class="cs"><div class="csl">Saldo</div><div class="csv" style="color:var(--amber)">${fmtMil(sd)}</div></div>
       <div class="cs"><div class="csl">Cuota actual</div><div class="csv" style="color:var(--green)">${fmt(c.cuota)}</div></div>
       <div class="cs"><div class="csl">Progreso</div><div class="csv">${c.pagadas}/${c.numCuotas}</div></div>
       <div class="cs"><div class="csl">Mora</div><div class="csv" style="color:${m>0?'var(--red)':'var(--text2)'}">${m>0?fmt(m):'$0'}</div></div>
@@ -1486,7 +1510,8 @@ function renderRuta(){
   document.getElementById('r-count-pend').textContent=countPend;
   document.getElementById('r-count-cob').textContent=countCob;
   document.getElementById('r-count-mora').textContent=countMora;
-  document.getElementById('r-pct-label').textContent='Progreso '+pct+'%';
+  const esperado=cobrado+pendiente; // lo recogido hoy + lo que falta por recoger
+  document.getElementById('r-pct-label').textContent='Progreso '+pct+'% · recogido '+fmtMil(cobrado)+' de '+fmtMil(esperado);
   document.getElementById('r-prog-bar').style.width=pct+'%';
   // Badge tab
   const badge=document.getElementById('badge-ruta');
@@ -1497,7 +1522,15 @@ function renderRuta(){
   renderRutaProximosDias();
   const el=document.getElementById('lista-ruta');
   if(!ruta.length){el.innerHTML='<div class="empty"><div class="empty-i">🎉</div><div class="empty-t">Sin cobros para hoy</div></div>';return;}
-  const ord=[...ruta].sort((a,b)=>(sameCoDate(a.ultimoPago,h)?1:0)-(sameCoDate(b.ultimoPago,h)?1:0));
+  // Orden inteligente: primero lo urgente. Pagados de hoy al fondo; entre los pendientes,
+  // mayor mora primero y luego más días de atraso (lo más riesgoso de cobrar va arriba).
+  const ord=[...ruta].sort((a,b)=>{
+    const pa=sameCoDate(a.ultimoPago,h)?1:0, pb=sameCoDate(b.ultimoPago,h)?1:0;
+    if(pa!==pb)return pa-pb;
+    const ma=mora(a), mb=mora(b);
+    if(mb!==ma)return mb-ma;
+    return (diasMora(b)||0)-(diasMora(a)||0);
+  });
   el.innerHTML=ord.map(c=>{
     const yp=sameCoDate(c.ultimoPago,h);
     const noPagoHoy=!yp&&!!(c.historialNoPago&&c.historialNoPago.some(n=>sameCoDate(n.fecha,h)));
@@ -1576,7 +1609,7 @@ function renderTodos(){
         <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end">${badge}${badgeSoli}</div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:9px">
-        <div class="cs"><div class="csl">Saldo</div><div class="csv" style="color:var(--amber)">${fmt(sd)}</div></div>
+        <div class="cs"><div class="csl">Saldo</div><div class="csv" style="color:var(--amber)">${fmtMil(sd)}</div></div>
         <div class="cs"><div class="csl">Cuota</div><div class="csv" style="color:var(--green)">${fmt(c.cuota)}</div></div>
       </div>
       <div class="prog"><div class="prog-f" style="width:${pct}%"></div></div>
@@ -1607,6 +1640,12 @@ function recalcConfirm(){
   document.getElementById('confirm-amount').textContent=fmt(total);
   document.getElementById('confirm-amount').style.color=m>0?'var(--red)':'var(--green)';
   document.getElementById('confirm-sub').textContent=m>0?`Cuota ${c.pagadas+1}/${c.numCuotas} + mora ${fmt(m)}`:`Cuota ${c.pagadas+1} de ${c.numCuotas}`;
+}
+function addMoraRapida(n){
+  const inp=document.getElementById('confirm-mora');if(!inp)return;
+  const cur=Math.max(0,parseFloat(inp.value)||0);
+  inp.value=(n===0)?0:cur+n; // 0 = limpiar
+  recalcConfirm();
 }
 function cerrarConfirm(){document.getElementById('confirm-overlay').classList.remove('open');pendingPago=null;}
 
