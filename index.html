@@ -256,6 +256,10 @@ document.readyState==='loading'?document.addEventListener('DOMContentLoaded',ren
     <div class="ct">Liquidaciones recibidas</div>
     <div id="g-liquidaciones"></div>
   </div>
+  <div class="card">
+    <div class="ct">🛡️ Aporte de seguridad</div>
+    <div id="g-seguridad"></div>
+  </div>
 </div>
 
 <div id="panel-nuevo" class="panel">
@@ -1012,10 +1016,11 @@ function renderGanancias(){
   }
 
   const lEl=document.getElementById('g-liquidaciones');
-  if(!liquidaciones.length){
+  const liqCash=(liquidaciones||[]).filter(l=>!l.esSeguridad);
+  if(!liqCash.length){
     lEl.innerHTML='<div style="font-size:13px;color:var(--text3);padding:10px 0;text-align:center">Sin liquidaciones recibidas aún</div>';
   } else {
-    lEl.innerHTML=liquidaciones.slice().reverse().map(l=>{
+    lEl.innerHTML=liqCash.slice().reverse().map(l=>{
       const ts=new Date(l.ts).toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric'});
       return`<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border)">
         <div>
@@ -1025,6 +1030,25 @@ function renderGanancias(){
         <div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--green)">${fmt(l.monto)}</div>
       </div>`;
     }).join('');
+  }
+
+  const segEl=document.getElementById('g-seguridad');
+  if(segEl){
+    const segs=(liquidaciones||[]).filter(l=>l.esSeguridad).slice().sort((a,b)=>(b.ts||0)-(a.ts||0));
+    if(!segs.length){
+      segEl.innerHTML='<div style="font-size:13px;color:var(--text3);padding:10px 0;text-align:center">Sin aportes de seguridad registrados</div>';
+    } else {
+      segEl.innerHTML='<div style="font-size:11px;color:var(--text3);margin-bottom:8px">Tu mitad del aporte de seguridad se descuenta de tu comisión (el admin paga el total; tú y él ponen mitad y mitad).</div>'+segs.map(l=>{
+        const ts=new Date(l.ts).toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric'});
+        return`<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border)">
+          <div>
+            <div style="font-size:13px;font-weight:500">${l.mes||l.nota||'Aporte'}</div>
+            <div style="font-size:11px;color:var(--text3)">${ts} · total del mes ${fmtMil(l.segTotal||0)}</div>
+          </div>
+          <div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--amber)">−${fmtMil(l.segCobrador||0)}</div>
+        </div>`;
+      }).join('');
+    }
   }
 }
 
